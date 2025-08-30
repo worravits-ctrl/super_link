@@ -605,9 +605,12 @@
                     ⚙️ ตั้งค่า API
                 </button>
                 <button class="btn btn-secondary" id="exportBtn">
-                    💾 ส่งออกข้อมูล
+                    💾 ส่งออก JSON
                 </button>
-                <span class="import-help">รองรับไฟล์ HTML หรือ JSON</span>
+                <button class="btn btn-secondary" id="exportHtmlBtn">
+                    📁 ส่งออก HTML (Chrome)
+                </button>
+                <span class="import-help">รองรับไฟล์ HTML (Chrome Bookmarks) หรือ JSON</span>
             </div>
         </div>
 
@@ -664,6 +667,7 @@
                 this.bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
                 this.setApiBtn = document.getElementById('setApiBtn');
                 this.exportBtn = document.getElementById('exportBtn');
+                this.exportHtmlBtn = document.getElementById('exportHtmlBtn');
             }
 
             bindEvents() {
@@ -721,7 +725,11 @@
 
                 // Export functionality
                 this.exportBtn.addEventListener('click', () => {
-                    this.exportLinks();
+                    this.exportLinks('json');
+                });
+
+                this.exportHtmlBtn.addEventListener('click', () => {
+                    this.exportLinks('html');
                 });
 
                 // Pause/resume autosync with page visibility
@@ -1523,26 +1531,77 @@
                 }, 3000);
             }
 
-            exportLinks() {
+            exportLinks(format = 'json') {
                 try {
-                    const data = {
-                        exportDate: new Date().toISOString(),
-                        linksCount: this.links.length,
-                        links: this.links
-                    };
+                    let dataStr, fileName, mimeType;
+                    const currentDate = new Date().toISOString().split('T')[0];
                     
-                    const dataStr = JSON.stringify(data, null, 2);
-                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    if (format === 'html') {
+                        // Chrome Bookmarks HTML format
+                        dataStr = this.generateChromeBookmarksHTML();
+                        fileName = `bookmarks_${currentDate}.html`;
+                        mimeType = 'text/html';
+                    } else {
+                        // JSON format
+                        const data = {
+                            exportDate: new Date().toISOString(),
+                            linksCount: this.links.length,
+                            links: this.links
+                        };
+                        dataStr = JSON.stringify(data, null, 2);
+                        fileName = `super-link-backup-${currentDate}.json`;
+                        mimeType = 'application/json';
+                    }
                     
+                    const dataBlob = new Blob([dataStr], {type: mimeType});
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(dataBlob);
-                    link.download = `super-link-backup-${new Date().toISOString().split('T')[0]}.json`;
+                    link.download = fileName;
                     link.click();
                     
-                    this.showNotification(`💾 ส่งออกข้อมูล ${this.links.length} รายการสำเร็จ!`);
+                    this.showNotification(`💾 ส่งออกข้อมูล ${this.links.length} รายการ (${format.toUpperCase()}) สำเร็จ!`);
                 } catch (error) {
                     this.showNotification('❌ ไม่สามารถส่งออกข้อมูลได้', 'error');
                 }
+            }
+
+            generateChromeBookmarksHTML() {
+                const currentDate = new Date().toISOString();
+                const timestamp = Math.floor(Date.now() / 1000);
+                
+                let html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file.
+     It will be read and overwritten.
+     DO NOT EDIT! -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><H3 ADD_DATE="${timestamp}" LAST_MODIFIED="${timestamp}" PERSONAL_TOOLBAR_FOLDER="true">Bookmarks bar</H3>
+    <DL><p>
+        <DT><H3 ADD_DATE="${timestamp}" LAST_MODIFIED="${timestamp}">Super Link Manager</H3>
+        <DL><p>
+`;
+
+                this.links.forEach(link => {
+                    const addDate = link.dateAdded ? Math.floor(new Date(link.dateAdded).getTime() / 1000) : timestamp;
+                    const escapedTitle = this.escapeHtml(link.title || 'Untitled');
+                    const escapedUrl = this.escapeHtml(link.url);
+                    
+                    html += `            <DT><A HREF="${escapedUrl}" ADD_DATE="${addDate}">${escapedTitle}</A>\n`;
+                });
+
+                html += `        </DL><p>
+    </DL><p>
+</DL><p>`;
+
+                return html;
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
         }
 

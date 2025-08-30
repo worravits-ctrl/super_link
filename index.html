@@ -551,8 +551,8 @@
             <h1>🔗 Link Manager</h1>
             <p>จัดการและเก็บลิงค์ที่สำคัญของคุณในที่เดียว | 🌐 ซิงค์ออนไลน์ผ่าน GitHub และ Vercel</p>
             <div id="serverlessWarning" style="display: none; background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #ffeaa7;">
-                ⚠️ <strong>หมายเหตุ:</strong> เว็บไซต์นี้ทำงานบน Serverless Platform - ข้อมูลจะถูกรีเซ็ตเมื่อรีเฟรชหน้า<br>
-                💡 <strong>แนะนำ:</strong> ใช้ฟีเจอร์ "📁 นำเข้า Bookmarks" เพื่อกู้คืนข้อมูลเก่า หรือใช้งานใน Local Environment
+                ⚠️ <strong>หมายเหตุ:</strong> เว็บไซต์นี้ทำงานบน Serverless Platform - ข้อมูลจะถูกบันทึกใน Browser Storage<br>
+                💡 <strong>การใช้งาน:</strong> ข้อมูลจะไม่หายเมื่อรีเฟรช แต่จะหายเมื่อล้าง Browser Data หรือเปลี่ยนเบราว์เซอร์
             </div>
         </div>
 
@@ -1160,10 +1160,12 @@
             }
 
             saveLinks() {
+                // Always save to localStorage first for persistence
+                localStorage.setItem('linkManager_links', JSON.stringify(this.links));
+                
+                // Also sync to server if online
                 if (this.isOnlineStorage) {
                     this.syncAllToServer();
-                } else {
-                    localStorage.setItem('linkManager_links', JSON.stringify(this.links));
                 }
             }
 
@@ -1186,18 +1188,33 @@
                     const serverLinks = await this.fetchServerLinks(resolved);
                     if (!Array.isArray(serverLinks)) throw new Error('รูปแบบข้อมูลไม่ถูกต้อง');
                     this.isOnlineStorage = true;
-                    // Prefer server order if exists
-                    this.links = serverLinks.length ? serverLinks : this.links;
-                    if (serverLinks.length === 0 && this.links.length > 0) {
-                        await this.syncAllToServer();
-                    }
-                    this.handleSearch();
-                    this.lastServerHash = this.computeHash(this.links);
                     
                     // Check if running on serverless (Vercel)
                     const isServerless = this.apiEndpointResolved.includes('vercel.app') || this.apiEndpointResolved.includes('vercel.com');
+                    
                     if (isServerless) {
-                        this.showNotification(`⚠️ โหมดออนไลน์: Serverless (ข้อมูลจะรีเซ็ตเมื่อรีเฟรช)`);
+                        // For serverless: prioritize localStorage, only use server as fallback
+                        if (this.links.length > 0) {
+                            // Keep existing localStorage data and sync it to server
+                            await this.syncAllToServer();
+                        } else if (serverLinks.length > 0) {
+                            // Only use server data if localStorage is empty
+                            this.links = serverLinks;
+                            localStorage.setItem('linkManager_links', JSON.stringify(this.links));
+                        }
+                    } else {
+                        // For persistent servers: prefer server data
+                        this.links = serverLinks.length ? serverLinks : this.links;
+                        if (serverLinks.length === 0 && this.links.length > 0) {
+                            await this.syncAllToServer();
+                        }
+                    }
+                    
+                    this.handleSearch();
+                    this.lastServerHash = this.computeHash(this.links);
+                    
+                    if (isServerless) {
+                        this.showNotification(`⚠️ โหมดออนไลน์: Serverless (ข้อมูลบันทึกใน Browser)`);
                         // Show serverless warning
                         const warning = document.getElementById('serverlessWarning');
                         if (warning) warning.style.display = 'block';

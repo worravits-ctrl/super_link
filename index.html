@@ -551,14 +551,15 @@
         import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
         
-        // Firebase Configuration (Demo - จะต้องใส่ config จริงของคุณ)
+        // Firebase Configuration (จริง)
         const firebaseConfig = {
-            apiKey: "demo-api-key",
-            authDomain: "super-link-demo.firebaseapp.com",
-            projectId: "super-link-demo",
-            storageBucket: "super-link-demo.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "1:123456789:web:abcdef123456"
+            apiKey: "AIzaSyAa4KCAWVC0bBXOTWobqqm22-vr6Y6xt6k",
+            authDomain: "super-link-manager.firebaseapp.com",
+            projectId: "super-link-manager",
+            storageBucket: "super-link-manager.firebasestorage.app",
+            messagingSenderId: "916756230155",
+            appId: "1:916756230155:web:ea8c683122d8c7cdc6d70e",
+            measurementId: "G-DPJTXWWGPG"
         };
         
         // Initialize Firebase
@@ -961,6 +962,36 @@
                     console.error('Firebase load error:', error);
                     this.showNotification('❌ ไม่สามารถโหลดจาก Firebase ได้', 'error');
                     return false;
+                }
+            }
+
+            showFirebaseStatus(message, isConnected = false) {
+                const statusElement = document.getElementById('firebaseStatus');
+                const statusText = document.getElementById('firebaseStatusText');
+                
+                if (statusElement && statusText) {
+                    statusText.textContent = message;
+                    statusElement.style.display = 'block';
+                    
+                    if (isConnected) {
+                        statusElement.style.background = '#d1ecf1';
+                        statusElement.style.color = '#0c5460';
+                        statusElement.style.borderColor = '#bee5eb';
+                    } else {
+                        statusElement.style.background = '#f8d7da';
+                        statusElement.style.color = '#721c24';
+                        statusElement.style.borderColor = '#f5c6cb';
+                    }
+                    
+                    // Auto hide after 5 seconds
+                    setTimeout(() => {
+                        statusElement.style.transition = 'opacity 0.5s ease-out';
+                        statusElement.style.opacity = '0';
+                        setTimeout(() => {
+                            statusElement.style.display = 'none';
+                            statusElement.style.opacity = '1';
+                        }, 500);
+                    }, 5000);
                 }
             }
 

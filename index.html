@@ -544,6 +544,39 @@
             }
         }
     </style>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
+        
+        // Firebase Configuration (Demo - จะต้องใส่ config จริงของคุณ)
+        const firebaseConfig = {
+            apiKey: "demo-api-key",
+            authDomain: "super-link-demo.firebaseapp.com",
+            projectId: "super-link-demo",
+            storageBucket: "super-link-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // Make Firebase available globally
+        window.firebaseDB = db;
+        window.firebaseAuth = auth;
+        window.firebaseModules = {
+            collection, addDoc, getDocs, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy,
+            signInAnonymously, onAuthStateChanged
+        };
+        
+        // Auto sign in anonymously
+        signInAnonymously(auth).catch(console.error);
+    </script>
 </head>
 <body>
     <div class="container">
@@ -553,6 +586,10 @@
             <div id="serverlessWarning" style="display: none; background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #ffeaa7;">
                 ⚠️ <strong>หมายเหตุ:</strong> เว็บไซต์นี้ทำงานบน Serverless Platform - ข้อมูลจะถูกบันทึกใน Browser Storage<br>
                 💡 <strong>การใช้งาน:</strong> ข้อมูลจะไม่หายเมื่อรีเฟรช แต่จะหายเมื่อล้าง Browser Data หรือเปลี่ยนเบราว์เซอร์
+            </div>
+            <div id="firebaseStatus" style="display: none; background: #d1ecf1; color: #0c5460; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #bee5eb;">
+                🔥 <strong>Firebase:</strong> <span id="firebaseStatusText">กำลังเชื่อมต่อ...</span><br>
+                💾 <strong>การบันทึก:</strong> ข้อมูลซิงค์ออนไลน์แบบ Real-time ข้ามอุปกรณ์
             </div>
         </div>
 
@@ -631,6 +668,8 @@
                 this.apiBase = this.getInitialApiBase();
                 this.apiEndpointResolved = '';
                 this.isOnlineStorage = false; // switch to true when API reachable
+                this.useFirebase = false; // Firebase mode
+                this.firebaseUser = null;
                 this.links = this.loadLinks();
                 this.filteredLinks = [...this.links];
                 this.selectMode = false;
@@ -644,6 +683,8 @@
                 this.renderLinks();
                 // Setup DnD for reordering after initial render
                 this.setupReorderDnD();
+                // Initialize Firebase
+                this.initializeFirebase();
                 // Probe API availability
                 this.checkApiAvailable();
             }
@@ -770,6 +811,157 @@
                         this.updateBulkButtonsState();
                     }
                 });
+            }
+
+            // ==================== Firebase Methods ====================
+            async initializeFirebase() {
+                try {
+                    if (!window.firebaseAuth || !window.firebaseDB) {
+                        console.log('Firebase not loaded yet, retrying...');
+                        setTimeout(() => this.initializeFirebase(), 1000);
+                        return;
+                    }
+
+                    const { onAuthStateChanged } = window.firebaseModules;
+                    
+                    onAuthStateChanged(window.firebaseAuth, (user) => {
+                        if (user) {
+                            this.firebaseUser = user;
+                            this.useFirebase = true;
+                            console.log('🔥 Firebase authenticated:', user.uid);
+                            
+                            // Show Firebase status
+                            const statusElement = document.getElementById('firebaseStatus');
+                            const statusText = document.getElementById('firebaseStatusText');
+                            if (statusElement && statusText) {
+                                statusElement.style.display = 'block';
+                                statusText.textContent = 'เชื่อมต่อสำเร็จ 🟢';
+                                
+                                // Auto-hide after 5 seconds
+                                setTimeout(() => {
+                                    statusElement.style.transition = 'opacity 0.5s ease-out';
+                                    statusElement.style.opacity = '0';
+                                    setTimeout(() => {
+                                        statusElement.style.display = 'none';
+                                        statusElement.style.opacity = '1';
+                                    }, 500);
+                                }, 5000);
+                            }
+                            
+                            this.loadFromFirebase();
+                            this.showNotification('🔥 Firebase พร้อมใช้งาน!', 'success');
+                        } else {
+                            this.firebaseUser = null;
+                            this.useFirebase = false;
+                            
+                            // Show Firebase error status
+                            const statusElement = document.getElementById('firebaseStatus');
+                            const statusText = document.getElementById('firebaseStatusText');
+                            if (statusElement && statusText) {
+                                statusElement.style.display = 'block';
+                                statusText.textContent = 'ไม่สามารถเชื่อมต่อได้ 🔴';
+                            }
+                            
+                            console.log('Firebase auth failed');
+                        }
+                    });
+                } catch (error) {
+                    console.error('Firebase initialization error:', error);
+                    this.showNotification('❌ Firebase ไม่สามารถเชื่อมต่อได้', 'error');
+                }
+            }
+
+            async saveToFirebase() {
+                if (!this.useFirebase || !window.firebaseDB) return false;
+                
+                try {
+                    const { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy } = window.firebaseModules;
+                    const linksCollection = collection(window.firebaseDB, 'links');
+                    
+                    // Get existing docs
+                    const snapshot = await getDocs(linksCollection);
+                    const existingDocs = {};
+                    snapshot.forEach(doc => {
+                        existingDocs[doc.data().id] = doc.id;
+                    });
+                    
+                    // Update/Add links
+                    for (const link of this.links) {
+                        const linkData = {
+                            ...link,
+                            updatedAt: new Date(),
+                            userId: this.firebaseUser.uid
+                        };
+                        
+                        if (existingDocs[link.id]) {
+                            // Update existing
+                            await updateDoc(doc(window.firebaseDB, 'links', existingDocs[link.id]), linkData);
+                        } else {
+                            // Add new
+                            await addDoc(linksCollection, linkData);
+                        }
+                    }
+                    
+                    // Delete removed links
+                    const currentIds = new Set(this.links.map(l => l.id));
+                    for (const [linkId, docId] of Object.entries(existingDocs)) {
+                        if (!currentIds.has(parseInt(linkId))) {
+                            await deleteDoc(doc(window.firebaseDB, 'links', docId));
+                        }
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Firebase save error:', error);
+                    this.showNotification('❌ ไม่สามารถบันทึกไป Firebase ได้', 'error');
+                    return false;
+                }
+            }
+
+            async loadFromFirebase() {
+                if (!this.useFirebase || !window.firebaseDB) return false;
+                
+                try {
+                    const { collection, getDocs, query, orderBy } = window.firebaseModules;
+                    const linksQuery = query(
+                        collection(window.firebaseDB, 'links'),
+                        orderBy('updatedAt', 'desc')
+                    );
+                    
+                    const snapshot = await getDocs(linksQuery);
+                    const firebaseLinks = [];
+                    
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (data.userId === this.firebaseUser.uid) {
+                            firebaseLinks.push({
+                                id: data.id,
+                                url: data.url,
+                                title: data.title,
+                                favicon: data.favicon,
+                                addedAt: data.addedAt
+                            });
+                        }
+                    });
+                    
+                    if (firebaseLinks.length > 0) {
+                        this.links = firebaseLinks;
+                        this.filteredLinks = [...this.links];
+                        this.renderLinks();
+                        this.handleSearch(); // Apply any active search
+                        
+                        // Also backup to localStorage
+                        localStorage.setItem('linkManager_links', JSON.stringify(this.links));
+                        
+                        console.log(`🔥 Loaded ${firebaseLinks.length} links from Firebase`);
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Firebase load error:', error);
+                    this.showNotification('❌ ไม่สามารถโหลดจาก Firebase ได้', 'error');
+                    return false;
+                }
             }
 
             handleCheckAndClean() {
@@ -1159,20 +1351,26 @@
                 }
             }
 
-            saveLinks() {
+            async saveLinks() {
                 // Always save to localStorage first for persistence
                 localStorage.setItem('linkManager_links', JSON.stringify(this.links));
                 
-                // Also sync to server if online
-                if (this.isOnlineStorage) {
+                // Priority: Firebase > Server API
+                if (this.useFirebase) {
+                    await this.saveToFirebase();
+                } else if (this.isOnlineStorage) {
                     this.syncAllToServer();
                 }
             }
 
             loadLinks() {
                 try {
+                    // Load from localStorage first (always available)
                     const saved = localStorage.getItem('linkManager_links');
-                    return saved ? JSON.parse(saved) : [];
+                    const localLinks = saved ? JSON.parse(saved) : [];
+                    
+                    // Firebase will be loaded separately in initializeFirebase()
+                    return localLinks;
                 } catch {
                     return [];
                 }

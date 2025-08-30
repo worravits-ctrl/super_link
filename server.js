@@ -12,39 +12,69 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('.'));
 
-// Data file path
+// In-memory storage for serverless environment
+let memoryStorage = [];
+
+// Data file path (for local development only)
 const dataDir = path.join(__dirname, 'data');
 const dataFile = path.join(dataDir, 'links.json');
 
-// Ensure data directory exists
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+// Initialize data
+function initializeData() {
+    // Try to load from file (local development)
+    if (fs.existsSync(dataFile)) {
+        try {
+            const data = fs.readFileSync(dataFile, 'utf8');
+            memoryStorage = JSON.parse(data);
+            console.log('Data loaded from file:', memoryStorage.length, 'links');
+        } catch (error) {
+            console.error('Error reading links file:', error);
+            memoryStorage = [];
+        }
+    } else {
+        // Use default data for demo
+        memoryStorage = [
+            {
+                id: 1756452263064.2988,
+                url: "https://github.com/worravits-ctrl/super_link",
+                title: "Super Link Manager - GitHub Repository",
+                favicon: "https://www.google.com/s2/favicons?domain=github.com&sz=16",
+                dateAdded: "2025-08-30T07:24:23.064Z"
+            },
+            {
+                id: 1756452263064.236,
+                url: "https://vercel.com",
+                title: "Vercel - Deployment Platform",
+                favicon: "https://www.google.com/s2/favicons?domain=vercel.com&sz=16",
+                dateAdded: "2025-08-30T07:24:23.064Z"
+            }
+        ];
+        console.log('Initialized with default data');
+    }
 }
 
-// Initialize data file if it doesn't exist
-if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, JSON.stringify([]));
-}
+// Initialize on startup
+initializeData();
 
 // Helper functions
 function readLinks() {
-    try {
-        const data = fs.readFileSync(dataFile, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error reading links:', error);
-        return [];
-    }
+    return memoryStorage;
 }
 
 function writeLinks(links) {
-    try {
-        fs.writeFileSync(dataFile, JSON.stringify(links, null, 2));
-        return true;
-    } catch (error) {
-        console.error('Error writing links:', error);
-        return false;
+    memoryStorage = links;
+    // Try to write to file in local development
+    if (process.env.NODE_ENV !== 'production') {
+        try {
+            if (!fs.existsSync(dataDir)) {
+                fs.mkdirSync(dataDir, { recursive: true });
+            }
+            fs.writeFileSync(dataFile, JSON.stringify(links, null, 2));
+        } catch (error) {
+            console.error('Error writing to file (this is normal in serverless):', error.message);
+        }
     }
+    return true;
 }
 
 // API Routes

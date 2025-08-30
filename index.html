@@ -550,6 +550,10 @@
         <div class="header">
             <h1>🔗 Link Manager</h1>
             <p>จัดการและเก็บลิงค์ที่สำคัญของคุณในที่เดียว | 🌐 ซิงค์ออนไลน์ผ่าน GitHub และ Vercel</p>
+            <div id="serverlessWarning" style="display: none; background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #ffeaa7;">
+                ⚠️ <strong>หมายเหตุ:</strong> เว็บไซต์นี้ทำงานบน Serverless Platform - ข้อมูลจะถูกรีเซ็ตเมื่อรีเฟรชหน้า<br>
+                💡 <strong>แนะนำ:</strong> ใช้ฟีเจอร์ "📁 นำเข้า Bookmarks" เพื่อกู้คืนข้อมูลเก่า หรือใช้งานใน Local Environment
+            </div>
         </div>
 
         <div class="top-row">
@@ -599,6 +603,9 @@
                 </button>
                 <button class="btn btn-secondary" id="setApiBtn">
                     ⚙️ ตั้งค่า API
+                </button>
+                <button class="btn btn-secondary" id="exportBtn">
+                    💾 ส่งออกข้อมูล
                 </button>
                 <span class="import-help">รองรับไฟล์ HTML หรือ JSON</span>
             </div>
@@ -656,6 +663,7 @@
                 this.bulkSelectAllBtn = document.getElementById('bulkSelectAllBtn');
                 this.bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
                 this.setApiBtn = document.getElementById('setApiBtn');
+                this.exportBtn = document.getElementById('exportBtn');
             }
 
             bindEvents() {
@@ -709,6 +717,11 @@
                         this.showNotification('🔄 รีเซ็ต API base เป็นค่าเริ่มต้น');
                         this.checkApiAvailable();
                     }
+                });
+
+                // Export functionality
+                this.exportBtn.addEventListener('click', () => {
+                    this.exportLinks();
                 });
 
                 // Pause/resume autosync with page visibility
@@ -1172,7 +1185,17 @@
                     }
                     this.handleSearch();
                     this.lastServerHash = this.computeHash(this.links);
-                    this.showNotification(`🌐 โหมดออนไลน์: เชื่อมต่อสำเร็จ`);
+                    
+                    // Check if running on serverless (Vercel)
+                    const isServerless = this.apiEndpointResolved.includes('vercel.app') || this.apiEndpointResolved.includes('vercel.com');
+                    if (isServerless) {
+                        this.showNotification(`⚠️ โหมดออนไลน์: Serverless (ข้อมูลจะรีเซ็ตเมื่อรีเฟรช)`);
+                        // Show serverless warning
+                        const warning = document.getElementById('serverlessWarning');
+                        if (warning) warning.style.display = 'block';
+                    } else {
+                        this.showNotification(`🌐 โหมดออนไลน์: เชื่อมต่อสำเร็จ`);
+                    }
                     this.startAutoSync();
                 } catch (err) {
                     // stay offline, but notify briefly in console
@@ -1498,6 +1521,28 @@
                 setTimeout(() => {
                     this.notification.classList.remove('show');
                 }, 3000);
+            }
+
+            exportLinks() {
+                try {
+                    const data = {
+                        exportDate: new Date().toISOString(),
+                        linksCount: this.links.length,
+                        links: this.links
+                    };
+                    
+                    const dataStr = JSON.stringify(data, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(dataBlob);
+                    link.download = `super-link-backup-${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    
+                    this.showNotification(`💾 ส่งออกข้อมูล ${this.links.length} รายการสำเร็จ!`);
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถส่งออกข้อมูลได้', 'error');
+                }
             }
         }
 

@@ -1217,7 +1217,19 @@
                         this.showNotification(`⚠️ โหมดออนไลน์: Serverless (ข้อมูลบันทึกใน Browser)`);
                         // Show serverless warning
                         const warning = document.getElementById('serverlessWarning');
-                        if (warning) warning.style.display = 'block';
+                        if (warning) {
+                            warning.style.display = 'block';
+                            
+                            // ยุบแถบหมายเหตุหลังจาก 3 วินาที
+                            setTimeout(() => {
+                                warning.style.transition = 'opacity 0.5s ease-out';
+                                warning.style.opacity = '0';
+                                setTimeout(() => {
+                                    warning.style.display = 'none';
+                                    warning.style.opacity = '1'; // รีเซ็ตเพื่อใช้ครั้งต่อไป
+                                }, 500);
+                            }, 3000);
+                        }
                     } else {
                         this.showNotification(`🌐 โหมดออนไลน์: เชื่อมต่อสำเร็จ`);
                     }

@@ -655,7 +655,7 @@
                 this.useFirebase = false; // Switch to Supabase
                 this.useSupabase = true;
                 this.supabaseUser = null;
-                this.links = this.loadLinks();
+                this.links = []; // ไม่โหลดจาก localStorage - ใช้เฉพาะ Supabase
                 this.filteredLinks = [...this.links];
                 this.selectMode = false;
                 this.selectedIds = new Set();
@@ -665,7 +665,8 @@
                 this.lastServerHash = '';
                 this.initializeElements();
                 this.bindEvents();
-                this.renderLinks();
+                // ไม่ render ทันที - รอให้ Supabase โหลดข้อมูลก่อน
+                // this.renderLinks(); 
                 // Setup DnD for reordering after initial render
                 this.setupReorderDnD();
                 // Initialize Supabase
@@ -886,13 +887,17 @@
                 if (!this.useSupabase || !window.supabase) return false;
                 
                 try {
+                    console.log('🔍 Querying Supabase for all links (not filtering by user_id)');
+                    
                     const { data: supabaseLinks, error } = await window.supabase
                         .from('links')
                         .select('*')
-                        .eq('user_id', this.supabaseUser.id)
                         .order('order_index', { ascending: true });
                     
                     if (error) throw error;
+                    
+                    console.log('🔍 Raw Supabase query result:', supabaseLinks);
+                    console.log('🔍 Found', supabaseLinks?.length || 0, 'links');
                     
                     if (supabaseLinks && supabaseLinks.length > 0) {
                         // Convert Supabase format to app format
@@ -910,15 +915,23 @@
                         
                         console.log(`🗄️ Loaded ${supabaseLinks.length} links from Supabase`);
                     } else {
-                        // If Supabase is empty, sync localStorage data
-                        const localData = localStorage.getItem('linkManager_links');
-                        if (localData) {
-                            const localLinks = JSON.parse(localData);
-                            if (localLinks.length > 0) {
-                                this.links = localLinks;
-                                await this.saveToSupabase();
-                                console.log(`🗄️ Synced ${localLinks.length} links from localStorage to Supabase`);
-                            }
+                        // ไม่มีข้อมูลใน Supabase - เริ่มต้นด้วยอาร์เรย์ว่าง
+                        this.links = [];
+                        this.filteredLinks = [];
+                        this.renderLinks();
+                        console.log('🗄️ No data in Supabase - starting fresh');
+                        
+                        // ตรวจสอบว่ามีข้อมูลในตารางหรือไม่ (bypass RLS)
+                        const { data: allLinks, error: allError } = await window.supabase
+                            .rpc('get_all_links_count');
+                        
+                        if (!allError && allLinks) {
+                            console.log('🔍 Total records (RPC):', allLinks);
+                        } else {
+                            console.log('🔍 RPC error:', allError);
+                            
+                            // ลองใช้ service role key เพื่อดู raw data
+                            console.log('🔍 Trying to check RLS policies...');
                         }
                     }
                     
@@ -1132,6 +1145,7 @@
                     }, 5000);
                 }
             }
+
 
             handleCheckAndClean() {
                 if (this.links.length === 0) {
@@ -1565,38 +1579,21 @@
                     } catch (error) {
                         console.error('❌ Supabase save failed:', error);
                         
-                        // Fallback to localStorage when Supabase fails
-                        try {
-                            localStorage.setItem('linkManager_links', JSON.stringify(this.links));
-                            console.log('💾 Fallback: Saved to localStorage due to Supabase error');
-                            this.showNotification('⚠️ บันทึกใน Browser (Supabase error)', 'warning');
-                        } catch (localError) {
-                            console.error('❌ Both Supabase and localStorage failed:', localError);
-                            this.showNotification('❌ ไม่สามารถบันทึกข้อมูลได้', 'error');
-                            throw error;
-                        }
+                        // Supabase-only: ไม่ใช้ localStorage fallback
+                        this.showNotification('❌ ไม่สามารถบันทึกข้อมูลไปยัง Supabase ได้', 'error');
+                        throw error;
                     }
                 } else {
-                    // Fallback: บันทึกใน localStorage เฉพาะเมื่อ Supabase ไม่พร้อม
-                    localStorage.setItem('linkManager_links', JSON.stringify(this.links));
-                    console.log('💾 Fallback: Saved to localStorage');
+                    console.warn('⚠️ Supabase is not enabled - no data will be saved');
+                    this.showNotification('⚠️ Supabase ไม่ได้เปิดใช้งาน', 'warning');
                 }
             }
 
             loadLinks() {
-                // Firebase-first: รอให้ Firebase load ใน initializeFirebase()
-                // แต่ถ้า Firebase ไม่พร้อม ให้โหลดจาก localStorage เป็น fallback
-                try {
-                    const saved = localStorage.getItem('linkManager_links');
-                    const localLinks = saved ? JSON.parse(saved) : [];
-                    if (localLinks.length > 0) {
-                        console.log(`💾 Loaded ${localLinks.length} links from localStorage as fallback`);
-                    }
-                    return localLinks;
-                } catch (error) {
-                    console.error('Error loading from localStorage:', error);
-                    return [];
-                }
+                // Supabase-only: ไม่โหลดจาก localStorage แล้ว
+                // ข้อมูลจะถูกโหลดจาก Supabase ใน initializeSupabase() แทน
+                console.log('� loadLinks() - ข้อมูลจะถูกโหลดจาก Supabase เท่านั้น');
+                return []; // คืนค่าอาร์เรย์ว่าง
             }
 
             async checkApiAvailable() {

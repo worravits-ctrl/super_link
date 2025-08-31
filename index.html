@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Link Manager - จัดการลิงค์ของคุณ</title>
+    <title>Link Manager - จัดการลิงค์ของคุณ (Supabase Only)</title>
     <style>
         :root {
             --primary-color: #3b82f6;
@@ -566,13 +566,11 @@
     <div class="container">
         <div class="header">
             <h1>🔗 Link Manager</h1>
-            <p>จัดการและเก็บลิงค์ที่สำคัญของคุณในที่เดียว | 🔥 ใช้ Supabase Cloud Storage</p>
-            <div id="serverlessWarning" style="display: none; background: #fff3cd; color: #856404; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #ffeaa7;">
-                ⚠️ <strong>หมายเหตุ:</strong> เว็บไซต์นี้ทำงานบน Serverless Platform - ข้อมูลจะถูกบันทึกใน Browser Storage<br>
-            </div>
-            <div id="supabaseStatus" style="display: none; background: #d1ecf1; color: #0c5460; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #bee5eb;">
+            <p>จัดการและเก็บลิงค์ที่สำคัญของคุณในที่เดียว | 🔥 ใช้ Supabase Database เท่านั้น</p>
+
+            <div id="supabaseStatus" style="display: block; background: #d1ecf1; color: #0c5460; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #bee5eb;">
                 �️ <strong>Supabase:</strong> <span id="supabaseStatusText">กำลังเชื่อมต่อ...</span><br>
-                💾 <strong>การบันทึก:</strong> ข้อมูลซิงค์ออนไลน์แบบ Real-time + Unlimited quota
+                💾 <strong>การบันทึก:</strong> ข้อมูลเก็บใน Supabase Database เท่านั้น (ไม่มี Local Storage)
             </div>
         </div>
 
@@ -651,30 +649,22 @@
     <script>
         class LinkManager {
             constructor() {
-                this.apiBase = this.getInitialApiBase();
-                this.apiEndpointResolved = '';
-                this.isOnlineStorage = false; // switch to true when API reachable
-                this.useFirebase = false; // Switch to Supabase
-                this.useSupabase = true;
+                this.useSupabase = true; // ใช้เฉพาะ Supabase
                 this.supabaseUser = null;
-                this.links = []; // ไม่โหลดจาก localStorage - ใช้เฉพาะ Supabase
+                this.links = []; // ข้อมูลจาก Supabase เท่านั้น
                 this.filteredLinks = [...this.links];
                 this.selectMode = false;
                 this.selectedIds = new Set();
                 this.maxUrlLength = 300; // เกณฑ์ URL ยาวเกิน
-                this.syncIntervalMs = 8000; // ดึงอัปเดตทุก 8 วินาที เมื่อออนไลน์
+                this.syncIntervalMs = 8000; // ดึงอัปเดตทุก 8 วินาที
                 this.syncTimer = null;
                 this.lastServerHash = '';
                 this.initializeElements();
                 this.bindEvents();
-                // ไม่ render ทันที - รอให้ Supabase โหลดข้อมูลก่อน
-                // this.renderLinks(); 
-                // Setup DnD for reordering after initial render
+                // รอให้ Supabase โหลดข้อมูลก่อน
                 this.setupReorderDnD();
                 // Initialize Supabase
                 this.initializeSupabase();
-                // Probe API availability
-                this.checkApiAvailable();
             }
 
             initializeElements() {
@@ -694,7 +684,6 @@
                 this.bulkSelectToggleBtn = document.getElementById('bulkSelectToggleBtn');
                 this.bulkSelectAllBtn = document.getElementById('bulkSelectAllBtn');
                 this.bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-                this.setApiBtn = document.getElementById('setApiBtn');
                 this.exportBtn = document.getElementById('exportBtn');
                 this.exportHtmlBtn = document.getElementById('exportHtmlBtn');
             }
@@ -734,28 +723,6 @@
                 // Check and clean unsafe/long URLs
                 this.checkAndCleanBtn.addEventListener('click', this.handleCheckAndClean.bind(this));
 
-                // API settings
-                this.setApiBtn.addEventListener('click', () => {
-                    const current = this.apiBase || '';
-                    const currentDisplay = current || 'ไม่ได้ตั้งค่า (ใช้ค่าเริ่มต้น)';
-                    const input = prompt(`ตั้งค่า API Base URL:\n\nปัจจุบัน: ${currentDisplay}\n\nใส่ URL ใหม่ (เช่น https://your-app.vercel.app/api)\nหรือปล่อยว่างเพื่อใช้ค่าเริ่มต้น`, current);
-                    if (input === null) return; // canceled
-                    const trimmed = (input || '').trim();
-                    if (trimmed) {
-                        this.setApiBase(trimmed.replace(/\/$/, ''));
-                        this.showNotification('✅ บันทึก API base แล้ว');
-                        this.checkApiAvailable();
-                    } else {
-                        // clear
-                        localStorage.removeItem('linkManager_apiBase');
-                        this.apiBase = this.getInitialApiBase(true);
-                        this.isOnlineStorage = false;
-                        this.stopAutoSync();
-                        this.showNotification('🔄 รีเซ็ต API base เป็นค่าเริ่มต้น');
-                        this.checkApiAvailable();
-                    }
-                });
-
                 // Export functionality
                 this.exportBtn.addEventListener('click', () => {
                     this.exportLinks('json');
@@ -769,7 +736,7 @@
                 document.addEventListener('visibilitychange', () => {
                     if (document.hidden) {
                         this.stopAutoSync();
-                    } else if (this.isOnlineStorage) {
+                    } else {
                         this.startAutoSync();
                     }
                 });
@@ -1976,8 +1943,7 @@
                     `🚨 เคลียร์ข้อมูลทั้งหมด\n\n` +
                     `จะลบข้อมูลดังนี้:\n` +
                     `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
-                    `• ข้อมูลทั้งหมดใน Supabase\n` +
-                    `• ข้อมูลใน Local Storage\n\n` +
+                    `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
                     `⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!\n\n` +
                     `ต้องการดำเนินการต่อหรือไม่?`
                 );
@@ -1992,11 +1958,7 @@
                     this.filteredLinks = [];
                     this.renderLinks();
 
-                    // 2. เคลียร์ Local Storage
-                    localStorage.removeItem('linkManagerData');
-                    localStorage.removeItem('links');
-
-                    // 3. เคลียร์ข้อมูลทั้งหมดใน Supabase
+                    // 2. เคลียร์ข้อมูลทั้งหมดใน Supabase
                     if (this.useSupabase && window.supabase) {
                         // ลบข้อมูลทั้งหมดในตาราง (ทุก user)
                         const { error } = await window.supabase
@@ -2016,9 +1978,8 @@
                         `✅ เคลียร์ข้อมูลทั้งหมดเสร็จสิ้น!\n\n` +
                         `📊 สิ่งที่ถูกลบ:\n` +
                         `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
-                        `• ข้อมูลทั้งหมดใน Supabase\n` +
-                        `• ข้อมูลใน Local Storage\n\n` +
-                        `🎉 ตอนนี้เป็น Single User Mode แล้ว!`;
+                        `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
+                        `🎉 ตอนนี้เป็น Supabase-only Mode แล้ว!`;
 
                     this.showNotification(successMessage, 'success');
                     console.log('🧹 All data cleared successfully');

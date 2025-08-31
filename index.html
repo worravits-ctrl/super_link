@@ -610,6 +610,9 @@
                 <button class="btn btn-delete" id="clearAllBtn">
                     🗑️ ล้างข้อมูลทั้งหมด
                 </button>
+                <button class="btn btn-danger" id="clearAllDataBtn" style="background: #dc3545; margin-left: 10px;">
+                    🚨 เคลียร์ทั้งหมด (Web + Supabase)
+                </button>
                 <button class="btn btn-secondary" id="checkAndCleanBtn">
                     🛡️ ตรวจและลบลิงก์ไม่ปลอดภัย/ยาวเกิน
                 </button>
@@ -725,6 +728,10 @@
                 // Clear All Event
                 this.clearAllBtn.addEventListener('click', this.handleClearAll.bind(this));
 
+                // Clear All Data Event (Web + Supabase)
+                this.clearAllDataBtn = document.getElementById('clearAllDataBtn');
+                this.clearAllDataBtn.addEventListener('click', this.handleClearAllData.bind(this));
+
                 // Check and clean unsafe/long URLs
                 this.checkAndCleanBtn.addEventListener('click', this.handleCheckAndClean.bind(this));
 
@@ -822,22 +829,21 @@
                         return;
                     }
 
-                    // Anonymous authentication for Supabase  
-                    const { data, error } = await window.supabase.auth.signInAnonymously();
+                    // Use FIXED user ID for everyone (single user mode)
+                    this.supabaseUser = { 
+                        id: 'single-user-2025',  // Fixed ID for everyone
+                        aud: 'authenticated', 
+                        role: 'authenticated' 
+                    };
+                    this.useSupabase = true;
                     
-                    if (data.user && !error) {
-                        this.supabaseUser = data.user;
-                        this.useSupabase = true;
-                        console.log('🗄️ Supabase authenticated:', data.user.id);
-                        this.showSupabaseStatus('เชื่อมต่อสำเร็จ 🟢', true);
-                        await this.loadFromSupabase();
-                    } else {
-                        console.error('Supabase auth failed:', error);
-                        this.showSupabaseStatus('ไม่สามารถเชื่อมต่อได้ 🔴', false);
-                    }
+                    console.log('🗄️ Supabase using SINGLE user ID:', this.supabaseUser.id);
+                    this.showSupabaseStatus('เชื่อมต่อสำเร็จ (Single User Mode) 🟢', true);
+                    await this.loadFromSupabase();
+                    
                 } catch (error) {
                     console.error('Supabase initialization error:', error);
-                    this.showNotification('❌ Supabase ไม่สามารถเชื่อมต่อได้', 'error');
+                    this.showSupabaseStatus('ไม่สามารถเชื่อมต่อได้ 🔴', false);
                 }
             }
 
@@ -1963,6 +1969,64 @@
                     this.saveLinks();
                     this.handleSearch();
                     this.showNotification('ล้างข้อมูลทั้งหมดแล้ว! 🧹');
+                }
+            }
+
+            async handleClearAllData() {
+                const confirmed = confirm(
+                    `🚨 เคลียร์ข้อมูลทั้งหมด\n\n` +
+                    `จะลบข้อมูลดังนี้:\n` +
+                    `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
+                    `• ข้อมูลทั้งหมดใน Supabase\n` +
+                    `• ข้อมูลใน Local Storage\n\n` +
+                    `⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!\n\n` +
+                    `ต้องการดำเนินการต่อหรือไม่?`
+                );
+                
+                if (!confirmed) return;
+
+                try {
+                    this.showNotification('🔄 กำลังเคลียร์ข้อมูลทั้งหมด...', 'info');
+
+                    // 1. เคลียร์ข้อมูลในหน้าเว็บ
+                    this.links = [];
+                    this.filteredLinks = [];
+                    this.renderLinks();
+
+                    // 2. เคลียร์ Local Storage
+                    localStorage.removeItem('linkManagerData');
+                    localStorage.removeItem('links');
+
+                    // 3. เคลียร์ข้อมูลทั้งหมดใน Supabase
+                    if (this.useSupabase && window.supabase) {
+                        // ลบข้อมูลทั้งหมดในตาราง (ทุก user)
+                        const { error } = await window.supabase
+                            .from('links')
+                            .delete()
+                            .gte('id', 0); // ลบทุกแถว
+
+                        if (error) {
+                            console.error('❌ Supabase clear error:', error);
+                            throw error;
+                        }
+
+                        console.log('✅ Supabase data cleared');
+                    }
+
+                    const successMessage = 
+                        `✅ เคลียร์ข้อมูลทั้งหมดเสร็จสิ้น!\n\n` +
+                        `📊 สิ่งที่ถูกลบ:\n` +
+                        `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
+                        `• ข้อมูลทั้งหมดใน Supabase\n` +
+                        `• ข้อมูลใน Local Storage\n\n` +
+                        `🎉 ตอนนี้เป็น Single User Mode แล้ว!`;
+
+                    this.showNotification(successMessage, 'success');
+                    console.log('🧹 All data cleared successfully');
+
+                } catch (error) {
+                    console.error('❌ Clear all data error:', error);
+                    this.showNotification('❌ เกิดข้อผิดพลาดในการเคลียร์ข้อมูล: ' + error.message, 'error');
                 }
             }
 

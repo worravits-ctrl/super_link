@@ -613,6 +613,9 @@
                 <button class="btn btn-secondary" id="checkAndCleanBtn">
                     🛡️ ตรวจและลบลิงก์ไม่ปลอดภัย/ยาวเกิน
                 </button>
+                <button class="btn btn-warning" id="restoreBackupBtn" style="background: #f59e0b; color: white;">
+                    🔄 กู้คืนจาก Backup
+                </button>
                 <button class="btn btn-secondary" id="bulkSelectToggleBtn">
                     ✅ เลือกหลายรายการ
                 </button>
@@ -621,9 +624,6 @@
                 </button>
                 <button class="btn btn-delete" id="bulkDeleteBtn" disabled>
                     🗑️ ลบที่เลือก (0)
-                </button>
-                <button class="btn btn-secondary" id="setApiBtn">
-                    ⚙️ ตั้งค่า API
                 </button>
                 <button class="btn btn-secondary" id="exportBtn">
                     💾 ส่งออก JSON
@@ -659,6 +659,9 @@
                 this.syncIntervalMs = 8000; // ดึงอัปเดตทุก 8 วินาที
                 this.syncTimer = null;
                 this.lastServerHash = '';
+                // ระบบป้องกันข้อมูลหาย
+                this.backupData = []; // สำรองข้อมูลล่าสุด
+                this.isProcessingRiskyOperation = false; // ป้องกันการดำเนินการเสี่ยงพร้อมกัน
                 this.initializeElements();
                 this.bindEvents();
                 // รอให้ Supabase โหลดข้อมูลก่อน
@@ -681,6 +684,7 @@
                 this.removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
                 this.clearAllBtn = document.getElementById('clearAllBtn');
                 this.checkAndCleanBtn = document.getElementById('checkAndCleanBtn');
+                this.restoreBackupBtn = document.getElementById('restoreBackupBtn');
                 this.bulkSelectToggleBtn = document.getElementById('bulkSelectToggleBtn');
                 this.bulkSelectAllBtn = document.getElementById('bulkSelectAllBtn');
                 this.bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
@@ -722,6 +726,9 @@
 
                 // Check and clean unsafe/long URLs
                 this.checkAndCleanBtn.addEventListener('click', this.handleCheckAndClean.bind(this));
+
+                // Restore Backup Event
+                this.restoreBackupBtn.addEventListener('click', this.handleRestoreBackup.bind(this));
 
                 // Export functionality
                 this.exportBtn.addEventListener('click', () => {
@@ -884,6 +891,9 @@
                         this.filteredLinks = [...this.links];
                         this.renderLinks();
                         this.handleSearch();
+                        
+                        // สร้าง Backup อัตโนมัติหลังโหลดข้อมูล
+                        this.createBackup('after_load_supabase');
                         
                         console.log(`🗄️ Loaded ${supabaseLinks.length} links from Supabase`);
                     } else {
@@ -1302,14 +1312,22 @@
                 }
             }
 
-            handleDrop(e) {
+            async handleDrop(e) {
                 e.preventDefault();
                 this.dropZone.classList.remove('drag-over');
 
                 const url = this.getFirstUrlFromDataTransfer(e.dataTransfer);
                 if (url) {
-                    this.addLink(url);
-                    this.showNotification('เพิ่มลิงค์สำเร็จ! 🎉');
+                    // ใช้ระบบป้องกันข้อมูลหาย
+                    await this.performSafeOperation(
+                        'drop_link',
+                        async () => {
+                            await this.addLink(url);
+                            this.showNotification('🎉 เพิ่มลิงค์สำเร็จ!');
+                            return true;
+                        }
+                        // ไม่ต้องยืนยันสำหรับการลากลิงค์เดียว
+                    );
                 } else {
                     this.showNotification('ไม่พบลิงค์ที่ถูกต้อง', 'error');
                 }
@@ -1763,33 +1781,48 @@
                 localStorage.setItem('linkManager_apiBase', base);
             }
 
-            handleFileImport(e) {
+            async handleFileImport(e) {
                 const file = e.target.files[0];
                 if (!file) return;
 
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const content = event.target.result;
-                        let importedLinks = [];
+                // ใช้ระบบป้องกันข้อมูลหาย
+                await this.performSafeOperation(
+                    'import_file',
+                    async () => {
+                        const reader = new FileReader();
+                        
+                        return new Promise((resolve, reject) => {
+                            reader.onload = async (event) => {
+                                try {
+                                    const content = event.target.result;
+                                    let importedLinks = [];
 
-                        if (file.name.endsWith('.json')) {
-                            importedLinks = this.parseJsonBookmarks(content);
-                        } else if (file.name.endsWith('.html')) {
-                            importedLinks = this.parseHtmlBookmarks(content);
-                        }
+                                    if (file.name.endsWith('.json')) {
+                                        importedLinks = this.parseJsonBookmarks(content);
+                                    } else if (file.name.endsWith('.html')) {
+                                        importedLinks = this.parseHtmlBookmarks(content);
+                                    }
 
-                        if (importedLinks.length > 0) {
-                            this.importLinks(importedLinks);
-                            this.showNotification(`นำเข้า ${importedLinks.length} ลิงค์สำเร็จ! 🎉`);
-                        } else {
-                            this.showNotification('ไม่พบลิงค์ในไฟล์', 'error');
-                        }
-                    } catch (error) {
-                        this.showNotification('ไม่สามารถอ่านไฟล์ได้', 'error');
-                    }
-                };
-                reader.readAsText(file);
+                                    if (importedLinks.length > 0) {
+                                        await this.importLinks(importedLinks);
+                                        this.showNotification(`🎉 นำเข้า ${importedLinks.length} ลิงค์สำเร็จ!`);
+                                        resolve(true);
+                                    } else {
+                                        this.showNotification('ไม่พบลิงค์ในไฟล์', 'error');
+                                        resolve(false);
+                                    }
+                                } catch (error) {
+                                    this.showNotification('ไม่สามารถอ่านไฟล์ได้', 'error');
+                                    reject(error);
+                                }
+                            };
+                            
+                            reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์ได้'));
+                            reader.readAsText(file);
+                        });
+                    },
+                    `📁 นำเข้าไฟล์ ${file.name}\n\n⚠️ การดำเนินการนี้จะเพิ่มลิงค์ใหม่เข้าไปในฐานข้อมูล\nระบบจะสร้าง Backup อัตโนมัติเพื่อความปลอดภัย\n\nต้องการดำเนินการต่อหรือไม่?`
+                );
                 
                 // Reset file input
                 e.target.value = '';
@@ -1857,33 +1890,43 @@
                 });
             }
 
-            importLinks(importedLinks) {
+            async importLinks(importedLinks) {
                 let addedCount = 0;
                 
-                importedLinks.forEach(linkData => {
-                    // Check if link already exists
-                    const exists = this.links.some(existing => existing.url === linkData.url);
+                try {
+                    this.showNotification('🔄 กำลังนำเข้าลิงค์...', 'info');
                     
-                    if (!exists) {
-                        const link = {
-                            id: Date.now() + Math.random(),
-                            url: linkData.url,
-                            title: linkData.title,
-                            favicon: this.getFaviconUrl(linkData.url),
-                            dateAdded: new Date().toISOString()
-                        };
+                    for (const linkData of importedLinks) {
+                        // ตรวจสอบว่าลิงค์มีอยู่แล้วหรือไม่
+                        const exists = this.links.some(existing => existing.url === linkData.url);
                         
-                        this.links.unshift(link);
-                        addedCount++;
+                        if (!exists) {
+                            const link = {
+                                id: Date.now() + Math.random(),
+                                url: linkData.url,
+                                title: linkData.title,
+                                favicon: this.getFaviconUrl(linkData.url),
+                                dateAdded: new Date().toISOString()
+                            };
+                            
+                            this.links.unshift(link);
+                            addedCount++;
+                        }
                     }
-                });
 
-                if (addedCount > 0) {
-                    this.saveLinks();
-                    this.handleSearch();
+                    if (addedCount > 0) {
+                        // บันทึกไปยัง Supabase
+                        await this.saveLinks();
+                        this.handleSearch();
+                        console.log(`✅ นำเข้าสำเร็จ ${addedCount} ลิงค์`);
+                    }
+
+                    return addedCount;
+                    
+                } catch (error) {
+                    console.error('❌ เกิดข้อผิดพลาดในการนำเข้า:', error);
+                    throw error;
                 }
-
-                return addedCount;
             }
 
             handleRemoveDuplicates() {
@@ -1938,56 +1981,95 @@
                 }
             }
 
-            async handleClearAllData() {
+            async handleRestoreBackup() {
+                if (!this.backupData || !this.backupData.data || this.backupData.count === 0) {
+                    this.showNotification('❌ ไม่มี Backup ให้กู้คืน', 'error');
+                    return;
+                }
+
                 const confirmed = confirm(
+                    `🔄 กู้คืนข้อมูลจาก Backup\n\n` +
+                    `Backup วันที่: ${new Date(this.backupData.timestamp).toLocaleString('th-TH')}\n` +
+                    `เหตุผล: ${this.backupData.reason}\n` +
+                    `จำนวนลิงค์: ${this.backupData.count} รายการ\n\n` +
+                    `⚠️ การกู้คืนจะแทนที่ข้อมูลปัจจุบันทั้งหมด!\n\n` +
+                    `ต้องการดำเนินการต่อหรือไม่?`
+                );
+
+                if (!confirmed) return;
+
+                try {
+                    this.showNotification('🔄 กำลังกู้คืนข้อมูลจาก Backup...', 'info');
+                    
+                    const success = await this.restoreFromBackup(this.backupData);
+                    
+                    if (success) {
+                        this.showNotification('✅ กู้คืนข้อมูลสำเร็จ!', 'success');
+                    } else {
+                        this.showNotification('❌ ไม่สามารถกู้คืนข้อมูลได้', 'error');
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Restore backup error:', error);
+                    this.showNotification('❌ เกิดข้อผิดพลาดในการกู้คืน: ' + error.message, 'error');
+                }
+            }
+
+            async handleClearAllData() {
+                // ใช้ระบบป้องกันข้อมูลหายสำหรับการเคลียร์ข้อมูล
+                await this.performSafeOperation(
+                    'clear_all_data',
+                    async () => {
+                        try {
+                            this.showNotification('🔄 กำลังเคลียร์ข้อมูลทั้งหมด...', 'info');
+
+                            // 1. เคลียร์ข้อมูลในหน้าเว็บ
+                            this.links = [];
+                            this.filteredLinks = [];
+                            this.renderLinks();
+
+                            // 2. เคลียร์ข้อมูลทั้งหมดใน Supabase
+                            if (this.useSupabase && window.supabase) {
+                                // ลบข้อมูลทั้งหมดในตาราง (ทุก user)
+                                const { error } = await window.supabase
+                                    .from('links')
+                                    .delete()
+                                    .gte('id', 0); // ลบทุกแถว
+
+                                if (error) {
+                                    console.error('❌ Supabase clear error:', error);
+                                    throw error;
+                                }
+
+                                console.log('✅ Supabase data cleared');
+                            }
+
+                            const successMessage = 
+                                `✅ เคลียร์ข้อมูลทั้งหมดเสร็จสิ้น!\n\n` +
+                                `📊 สิ่งที่ถูกลบ:\n` +
+                                `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
+                                `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
+                                `🎉 ตอนนี้เป็น Supabase-only Mode แล้ว!`;
+
+                            this.showNotification(successMessage, 'success');
+                            console.log('🧹 All data cleared successfully');
+
+                            return true;
+
+                        } catch (error) {
+                            console.error('❌ Clear all data error:', error);
+                            this.showNotification('❌ เกิดข้อผิดพลาดในการเคลียร์ข้อมูล: ' + error.message, 'error');
+                            throw error;
+                        }
+                    },
                     `🚨 เคลียร์ข้อมูลทั้งหมด\n\n` +
                     `จะลบข้อมูลดังนี้:\n` +
                     `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
                     `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
+                    `🛡️ ระบบจะสร้าง Backup ก่อนลบ\n` +
                     `⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!\n\n` +
                     `ต้องการดำเนินการต่อหรือไม่?`
                 );
-                
-                if (!confirmed) return;
-
-                try {
-                    this.showNotification('🔄 กำลังเคลียร์ข้อมูลทั้งหมด...', 'info');
-
-                    // 1. เคลียร์ข้อมูลในหน้าเว็บ
-                    this.links = [];
-                    this.filteredLinks = [];
-                    this.renderLinks();
-
-                    // 2. เคลียร์ข้อมูลทั้งหมดใน Supabase
-                    if (this.useSupabase && window.supabase) {
-                        // ลบข้อมูลทั้งหมดในตาราง (ทุก user)
-                        const { error } = await window.supabase
-                            .from('links')
-                            .delete()
-                            .gte('id', 0); // ลบทุกแถว
-
-                        if (error) {
-                            console.error('❌ Supabase clear error:', error);
-                            throw error;
-                        }
-
-                        console.log('✅ Supabase data cleared');
-                    }
-
-                    const successMessage = 
-                        `✅ เคลียร์ข้อมูลทั้งหมดเสร็จสิ้น!\n\n` +
-                        `📊 สิ่งที่ถูกลบ:\n` +
-                        `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
-                        `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
-                        `🎉 ตอนนี้เป็น Supabase-only Mode แล้ว!`;
-
-                    this.showNotification(successMessage, 'success');
-                    console.log('🧹 All data cleared successfully');
-
-                } catch (error) {
-                    console.error('❌ Clear all data error:', error);
-                    this.showNotification('❌ เกิดข้อผิดพลาดในการเคลียร์ข้อมูล: ' + error.message, 'error');
-                }
             }
 
             showNotification(message, type = 'success') {
@@ -2071,6 +2153,159 @@
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
+            }
+
+            // ========== ระบบป้องกันฐานข้อมูลหาย ==========
+            
+            // สร้าง Backup อัตโนมัติ
+            createBackup(reason = 'auto') {
+                try {
+                    const backup = {
+                        timestamp: new Date().toISOString(),
+                        reason: reason,
+                        data: JSON.parse(JSON.stringify(this.links)), // Deep copy
+                        count: this.links.length
+                    };
+                    
+                    this.backupData = backup;
+                    console.log(`✅ สร้าง Backup: ${reason} (${backup.count} รายการ)`);
+                    
+                    return backup;
+                } catch (error) {
+                    console.error('❌ ไม่สามารถสร้าง Backup ได้:', error);
+                    return null;
+                }
+            }
+
+            // ตรวจสอบความปลอดภัยก่อนดำเนินการเสี่ยง
+            async performSafeOperation(operationName, riskyFunction, confirmMessage = null) {
+                // ป้องกันการทำงานพร้อมกัน
+                if (this.isProcessingRiskyOperation) {
+                    this.showNotification('⚠️ กำลังดำเนินการอยู่ กรุณารอสักครู่', 'warning');
+                    return false;
+                }
+
+                this.isProcessingRiskyOperation = true;
+
+                try {
+                    // สร้าง Backup ก่อนดำเนินการ
+                    const backup = this.createBackup(`before_${operationName}`);
+                    if (!backup) {
+                        this.showNotification('❌ ไม่สามารถสร้าง Backup ได้ ยกเลิกการดำเนินการ', 'error');
+                        return false;
+                    }
+
+                    // ยืนยันการทำงาน (ถ้ามี)
+                    if (confirmMessage) {
+                        const confirmed = confirm(confirmMessage);
+                        if (!confirmed) {
+                            this.showNotification('✋ ยกเลิกการดำเนินการ', 'info');
+                            return false;
+                        }
+                    }
+
+                    // ดำเนินการ
+                    const result = await riskyFunction();
+                    
+                    // ตรวจสอบว่าข้อมูลยังอยู่หรือไม่
+                    if (this.links.length === 0 && backup.count > 0) {
+                        console.warn('⚠️ ตรวจพบข้อมูลหายหลังจากดำเนินการ - กำลังกู้คืน...');
+                        await this.restoreFromBackup(backup);
+                        this.showNotification('🛡️ ตรวจพบข้อมูลหาย - กู้คืนจาก Backup อัตโนมัติ!', 'warning');
+                        return false;
+                    }
+
+                    return result;
+
+                } catch (error) {
+                    console.error(`❌ เกิดข้อผิดพลาดใน ${operationName}:`, error);
+                    
+                    // กู้คืนจาก Backup
+                    if (this.backupData && this.backupData.data) {
+                        await this.restoreFromBackup(this.backupData);
+                        this.showNotification('🛡️ กู้คืนข้อมูลจาก Backup เนื่องจากเกิดข้อผิดพลาด', 'warning');
+                    }
+                    
+                    this.showNotification(`❌ เกิดข้อผิดพลาด: ${error.message}`, 'error');
+                    return false;
+
+                } finally {
+                    this.isProcessingRiskyOperation = false;
+                }
+            }
+
+            // กู้คืนข้อมูลจาก Backup
+            async restoreFromBackup(backup) {
+                try {
+                    if (!backup || !backup.data || !Array.isArray(backup.data)) {
+                        throw new Error('Backup data ไม่ถูกต้อง');
+                    }
+
+                    console.log(`🔄 กำลังกู้คืนข้อมูลจาก Backup (${backup.count} รายการ)...`);
+                    
+                    // กู้คืนข้อมูลใน Memory
+                    this.links = JSON.parse(JSON.stringify(backup.data));
+                    this.filteredLinks = [...this.links];
+                    
+                    // กู้คืนไปยัง Supabase
+                    if (this.useSupabase && window.supabase) {
+                        // ลบข้อมูลเดิมใน Supabase
+                        await window.supabase
+                            .from('links')
+                            .delete()
+                            .eq('user_id', 'single-user-2025');
+
+                        // เพิ่มข้อมูลจาก Backup
+                        for (const link of this.links) {
+                            await window.supabase
+                                .from('links')
+                                .insert([{
+                                    id: link.id,
+                                    user_id: 'single-user-2025',
+                                    url: link.url,
+                                    title: link.title,
+                                    favicon: link.favicon,
+                                    date_added: link.dateAdded,
+                                    position: 0
+                                }]);
+                        }
+                    }
+
+                    // อัปเดต UI
+                    this.renderLinks();
+                    
+                    console.log(`✅ กู้คืนข้อมูลสำเร็จ (${this.links.length} รายการ)`);
+                    return true;
+
+                } catch (error) {
+                    console.error('❌ ไม่สามารถกู้คืนข้อมูลได้:', error);
+                    return false;
+                }
+            }
+
+            // ตรวจสอบสุขภาพข้อมูล
+            validateDataIntegrity() {
+                const issues = [];
+                
+                // ตรวจสอบข้อมูลพื้นฐาน
+                if (!Array.isArray(this.links)) {
+                    issues.push('links ไม่ใช่ Array');
+                }
+                
+                if (this.links.length === 0 && this.backupData && this.backupData.count > 0) {
+                    issues.push('ข้อมูลหายแต่มี Backup');
+                }
+
+                // ตรวจสอบ ID ซ้ำ
+                const ids = new Set();
+                this.links.forEach(link => {
+                    if (ids.has(link.id)) {
+                        issues.push(`ID ซ้ำ: ${link.id}`);
+                    }
+                    ids.add(link.id);
+                });
+
+                return issues;
             }
         }
 

@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Manager - จัดการลิงค์ของคุณ (Supabase Only)</title>
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --primary-hover: #2563eb;
+            --secondary-color: #f1f5f9;
+            --accent-color: #10b981;
+            --danger-color: #ef4444;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0;
+            padding: 1rem;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .top-row {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .drop-zone {
+            flex: 1;
+            min-height: 80px;
+            background: white;
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1rem;
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--primary-color);
+            background: #f8fafc;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .drop-zone.drag-over {
+            border-color: var(--accent-color);
+            background: #f0fdf4;
+        }
+
+        .drop-zone-content {
+            z-index: 2;
+        }
+
+        .drop-zone-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .search-section {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            background: white;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            outline: none;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .add-form {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .form-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .form-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.875rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn {
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+
+        .btn-delete {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .import-section {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .bulk-actions {
+            display: none;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .bulk-actions.visible {
+            display: flex;
+        }
+
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .link-card {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            transition: var(--transition);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .link-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-color);
+        }
+
+        .link-card.selected {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+        }
+
+        .link-checkbox {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .link-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+            overflow-wrap: break-word;
+        }
+
+        .link-url {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+            display: block;
+            overflow-wrap: break-word;
+        }
+
+        .link-url:hover {
+            text-decoration: underline;
+        }
+
+        .link-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .link-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .link-actions .btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent-color);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            max-width: 400px;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.error {
+            background: var(--danger-color);
+        }
+
+        .notification.warning {
+            background: #f59e0b;
+        }
+
+        .notification.info {
+            background: var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .top-row {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .form-group {
+                flex-direction: column;
+            }
+
+            .content-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .stats {
+                justify-content: center;
+            }
+
+            .links-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .import-section {
+                flex-direction: column;
+            }
+
+            .bulk-actions {
+                flex-direction: column;
+            }
+        }
+
+        .dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+
+        .drag-over-card {
+            border-color: var(--accent-color) !important;
+            background: #f0fdf4 !important;
+        }
+
+        /* Supabase status styles */
+        .status-online {
+            background: #d1f2eb !important;
+            color: #155724 !important;
+            border-color: #c3e6cb !important;
+        }
+
+        .status-offline {
+            background: #f8d7da !important;
+            color: #721c24 !important;
+            border-color: #f5c6cb !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 Link Manager</h1>
+            <p>จัดการและเก็บลิงค์ที่สำคัญของคุณในที่เดียว | 🔥 ใช้ Supabase Database เท่านั้น</p>
+            <div id="supabaseStatus" style="display: block; background: #d1ecf1; color: #0c5460; padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #bee5eb;">
+                🛡️ <strong>Supabase:</strong> <span id="supabaseStatusText">กำลังเชื่อมต่อ...</span><br>
+                💾 <strong>การบันทึก:</strong> ข้อมูลเก็บใน Supabase Database เท่านั้น (ไม่มี Local Storage)
+            </div>
+        </div>
+
+        <div class="top-row">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <div class="drop-zone-icon">📎</div>
+                    <h4 style="font-size: 0.9rem; margin: 0;">ลากลิงค์มาวางที่นี่</h4>
+                    <p style="font-size: 0.75rem; margin: 0; opacity: 0.7;">หรือลากจากแถบที่อยู่เบราว์เซอร์</p>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <input type="text" class="search-input" id="searchInput" placeholder="🔍 ค้นหาลิงค์...">
+            </div>
+        </div>
+
+        <div class="add-form">
+            <div class="form-group">
+                <input type="url" class="form-input" id="urlInput" placeholder="https://example.com">
+                <input type="text" class="form-input" id="titleInput" placeholder="ชื่อลิงค์ (ไม่บังคับ)">
+                <button class="btn btn-primary" id="addBtn">
+                    ➕ เพิ่มลิงค์
+                </button>
+            </div>
+            <div class="import-section">
+                <input type="file" id="bookmarkFile" accept=".html,.json" style="display: none;">
+                <button class="btn btn-secondary" id="importBtn">
+                    📁 นำเข้า Bookmarks
+                </button>
+                <button class="btn btn-secondary" id="removeDuplicatesBtn">
+                    🔗 ลบลิ้งก์ซ้ำ
+                </button>
+                <button class="btn btn-delete" id="clearAllBtn">
+                    🗑️ ล้างข้อมูลทั้งหมด
+                </button>
+                <button class="btn btn-danger" id="clearAllDataBtn" style="background: #dc3545; margin-left: 10px;">
+                    🚨 เคลียร์ Supabase ทั้งหมด
+                </button>
+                <button class="btn btn-secondary" id="checkAndCleanBtn">
+                    🧹 ตรวจสอบและล้างลิงค์
+                </button>
+                <button class="btn btn-secondary" id="exportBtn">
+                    💾 ส่งออก JSON
+                </button>
+                <button class="btn btn-secondary" id="exportHtmlBtn">
+                    📄 ส่งออก HTML
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="content-header">
+                <div class="stats">
+                    <span>📊 ทั้งหมด: <span id="totalCount">0</span></span>
+                    <span>🔍 แสดง: <span id="filteredCount">0</span></span>
+                </div>
+                <div class="bulk-actions" id="bulkActions">
+                    <button class="btn btn-secondary" id="bulkSelectToggleBtn">
+                        ☑️ เลือกหลายรายการ
+                    </button>
+                    <button class="btn btn-secondary" id="bulkSelectAllBtn">
+                        ✅ เลือกทั้งหมด
+                    </button>
+                    <button class="btn btn-delete" id="bulkDeleteBtn">
+                        🗑️ ลบที่เลือก
+                    </button>
+                </div>
+            </div>
+
+            <div class="links-grid" id="linksGrid">
+                <!-- Links will be rendered here -->
+            </div>
+
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div class="empty-state-icon">🔗</div>
+                <h3>ยังไม่มีลิงค์</h3>
+                <p>เพิ่มลิงค์แรกของคุณเพื่อเริ่มต้นใช้งาน</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <!-- Supabase CDN -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <script>
+        class LinkManager {
+            constructor() {
+                this.useSupabase = true; // ใช้เฉพาะ Supabase
+                this.supabaseUser = null;
+                this.links = []; // ข้อมูลจาก Supabase เท่านั้น
+                this.filteredLinks = [...this.links];
+                this.selectMode = false;
+                this.selectedIds = new Set();
+                this.maxUrlLength = 300; // เกณฑ์ URL ยาวเกิน
+                this.syncIntervalMs = 8000; // ดึงอัปเดตทุก 8 วินาที
+                this.syncTimer = null;
+                this.lastServerHash = '';
+                this.initializeElements();
+                this.bindEvents();
+                this.setupReorderDnD();
+                // Initialize Supabase
+                this.initializeSupabase();
+            }
+
+            initializeElements() {
+                this.dropZone = document.getElementById('dropZone');
+                this.searchInput = document.getElementById('searchInput');
+                this.urlInput = document.getElementById('urlInput');
+                this.titleInput = document.getElementById('titleInput');
+                this.addBtn = document.getElementById('addBtn');
+                this.linksGrid = document.getElementById('linksGrid');
+                this.emptyState = document.getElementById('emptyState');
+                this.notification = document.getElementById('notification');
+                this.importBtn = document.getElementById('importBtn');
+                this.bookmarkFile = document.getElementById('bookmarkFile');
+                this.removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
+                this.clearAllBtn = document.getElementById('clearAllBtn');
+                this.checkAndCleanBtn = document.getElementById('checkAndCleanBtn');
+                this.bulkSelectToggleBtn = document.getElementById('bulkSelectToggleBtn');
+                this.bulkSelectAllBtn = document.getElementById('bulkSelectAllBtn');
+                this.bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+                this.exportBtn = document.getElementById('exportBtn');
+                this.exportHtmlBtn = document.getElementById('exportHtmlBtn');
+                this.clearAllDataBtn = document.getElementById('clearAllDataBtn');
+            }
+
+            bindEvents() {
+                // Drag & Drop Events
+                this.dropZone.addEventListener('dragover', this.handleDragOver.bind(this));
+                this.dropZone.addEventListener('dragleave', this.handleDragLeave.bind(this));
+                this.dropZone.addEventListener('drop', this.handleDrop.bind(this));
+
+                // Form Events
+                this.addBtn.addEventListener('click', this.handleAddLink.bind(this));
+                this.urlInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.handleAddLink();
+                });
+                this.titleInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.handleAddLink();
+                });
+
+                // Search Event
+                this.searchInput.addEventListener('input', this.handleSearch.bind(this));
+
+                // Import Events
+                this.importBtn.addEventListener('click', () => this.bookmarkFile.click());
+                this.bookmarkFile.addEventListener('change', this.handleFileImport.bind(this));
+
+                // Remove Duplicates Event
+                this.removeDuplicatesBtn.addEventListener('click', this.handleRemoveDuplicates.bind(this));
+
+                // Clear All Event
+                this.clearAllBtn.addEventListener('click', this.handleClearAll.bind(this));
+
+                // Clear All Data Event (Supabase only)
+                this.clearAllDataBtn.addEventListener('click', this.handleClearAllData.bind(this));
+
+                // Check and clean unsafe/long URLs
+                this.checkAndCleanBtn.addEventListener('click', this.handleCheckAndClean.bind(this));
+
+                // Export functionality
+                this.exportBtn.addEventListener('click', () => {
+                    this.exportLinks('json');
+                });
+
+                this.exportHtmlBtn.addEventListener('click', () => {
+                    this.exportLinks('html');
+                });
+
+                // Pause/resume autosync with page visibility
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.stopAutoSync();
+                    } else {
+                        this.startAutoSync();
+                    }
+                });
+
+                // Bulk select events
+                this.bulkSelectToggleBtn.addEventListener('click', this.toggleSelectMode.bind(this));
+                this.bulkSelectAllBtn.addEventListener('click', this.selectAllVisible.bind(this));
+                this.bulkDeleteBtn.addEventListener('click', this.deleteSelected.bind(this));
+            }
+
+            // Supabase Configuration
+            async initializeSupabase() {
+                try {
+                    // Supabase configuration
+                    const SUPABASE_URL = 'https://vkkqdpstmkoxgxoysxjf.supabase.co';
+                    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZra3FkcHN0bWtveGd4b3lzeGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU3MjUyNzcsImV4cCI6MjA1MTMwMTI3N30.5xQLdBJK5pIB6XP0akvOZWR_9_8aJxNkDd6SZG9jcDQ';
+
+                    // Initialize Supabase client
+                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+                    // Use fixed user ID for single-user mode
+                    this.supabaseUser = { id: 'single-user-2025' };
+                    
+                    const statusText = document.getElementById('supabaseStatusText');
+                    const statusDiv = document.getElementById('supabaseStatus');
+                    
+                    statusText.textContent = '✅ เชื่อมต่อสำเร็จ (Single User Mode)';
+                    statusDiv.classList.add('status-online');
+                    
+                    // Load links from Supabase
+                    await this.loadLinksFromSupabase();
+                    
+                    // Start auto-sync
+                    this.startAutoSync();
+                    
+                    console.log('✅ Supabase initialized successfully (Supabase-only mode)');
+                    
+                } catch (error) {
+                    console.error('❌ Supabase initialization failed:', error);
+                    const statusText = document.getElementById('supabaseStatusText');
+                    const statusDiv = document.getElementById('supabaseStatus');
+                    
+                    statusText.textContent = '❌ เชื่อมต่อไม่สำเร็จ';
+                    statusDiv.classList.add('status-offline');
+                    
+                    this.showNotification('⚠️ ไม่สามารถเชื่อมต่อ Supabase ได้', 'error');
+                }
+            }
+
+            async loadLinksFromSupabase() {
+                if (!this.useSupabase || !window.supabase || !this.supabaseUser) return;
+
+                try {
+                    const { data, error } = await window.supabase
+                        .from('links')
+                        .select('*')
+                        .eq('user_id', this.supabaseUser.id)
+                        .order('created_at', { ascending: false });
+
+                    if (error) throw error;
+
+                    this.links = data || [];
+                    this.handleSearch(); // Apply current filter
+                    console.log(`📊 Loaded ${this.links.length} links from Supabase`);
+
+                } catch (error) {
+                    console.error('❌ Load from Supabase failed:', error);
+                    this.showNotification('⚠️ ไม่สามารถโหลดข้อมูลจาก Supabase ได้', 'error');
+                }
+            }
+
+            async saveToSupabase(link) {
+                if (!this.useSupabase || !window.supabase || !this.supabaseUser) return;
+
+                try {
+                    const linkData = {
+                        ...link,
+                        user_id: this.supabaseUser.id,
+                        created_at: new Date().toISOString()
+                    };
+
+                    const { data, error } = await window.supabase
+                        .from('links')
+                        .insert([linkData])
+                        .select();
+
+                    if (error) throw error;
+
+                    console.log('✅ Link saved to Supabase');
+                    return data[0];
+
+                } catch (error) {
+                    console.error('❌ Save to Supabase failed:', error);
+                    this.showNotification('⚠️ ไม่สามารถบันทึกลงฐานข้อมูลได้', 'error');
+                    throw error;
+                }
+            }
+
+            async deleteFromSupabase(linkId) {
+                if (!this.useSupabase || !window.supabase) return;
+
+                try {
+                    const { error } = await window.supabase
+                        .from('links')
+                        .delete()
+                        .eq('id', linkId);
+
+                    if (error) throw error;
+                    console.log('✅ Link deleted from Supabase');
+
+                } catch (error) {
+                    console.error('❌ Delete from Supabase failed:', error);
+                    this.showNotification('⚠️ ไม่สามารถลบจากฐานข้อมูลได้', 'error');
+                    throw error;
+                }
+            }
+
+            async handleClearAllData() {
+                const confirmed = confirm(
+                    `🚨 เคลียร์ข้อมูลทั้งหมด\n\n` +
+                    `จะลบข้อมูลดังนี้:\n` +
+                    `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
+                    `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
+                    `⚠️ การกระทำนี้ไม่สามารถยกเลิกได้!\n\n` +
+                    `ต้องการดำเนินการต่อหรือไม่?`
+                );
+                
+                if (!confirmed) return;
+
+                try {
+                    this.showNotification('🔄 กำลังเคลียร์ข้อมูลทั้งหมด...', 'info');
+
+                    // 1. เคลียร์ข้อมูลในหน้าเว็บ
+                    this.links = [];
+                    this.filteredLinks = [];
+                    this.renderLinks();
+
+                    // 2. เคลียร์ข้อมูลทั้งหมดใน Supabase
+                    if (this.useSupabase && window.supabase) {
+                        // ลบข้อมูลทั้งหมดในตาราง (ทุก user)
+                        const { error } = await window.supabase
+                            .from('links')
+                            .delete()
+                            .gte('id', 0); // ลบทุกแถว
+
+                        if (error) {
+                            console.error('❌ Supabase clear error:', error);
+                            throw error;
+                        }
+
+                        console.log('✅ Supabase data cleared');
+                    }
+
+                    const successMessage = 
+                        `✅ เคลียร์ข้อมูลทั้งหมดเสร็จสิ้น!\n\n` +
+                        `📊 สิ่งที่ถูกลบ:\n` +
+                        `• ลิ้งค์ทั้งหมดในหน้าเว็บ\n` +
+                        `• ข้อมูลทั้งหมดใน Supabase Database\n\n` +
+                        `🎉 ตอนนี้เป็น Supabase-only Mode แล้ว!`;
+
+                    this.showNotification(successMessage, 'success');
+                    console.log('🧹 All data cleared successfully');
+
+                } catch (error) {
+                    console.error('❌ Clear all data error:', error);
+                    this.showNotification('❌ เกิดข้อผิดพลาดในการเคลียร์ข้อมูล: ' + error.message, 'error');
+                }
+            }
+
+            // Start auto-sync timer
+            startAutoSync() {
+                if (this.syncTimer) return; // Already running
+                
+                this.syncTimer = setInterval(async () => {
+                    if (this.useSupabase && window.supabase) {
+                        await this.loadLinksFromSupabase();
+                    }
+                }, this.syncIntervalMs);
+                
+                console.log('🔄 Auto-sync started');
+            }
+
+            // Stop auto-sync timer
+            stopAutoSync() {
+                if (this.syncTimer) {
+                    clearInterval(this.syncTimer);
+                    this.syncTimer = null;
+                    console.log('⏹️ Auto-sync stopped');
+                }
+            }
+
+            async handleAddLink() {
+                const url = this.urlInput.value.trim();
+                const title = this.titleInput.value.trim();
+
+                if (!url) {
+                    this.showNotification('⚠️ กรุณาใส่ URL', 'warning');
+                    return;
+                }
+
+                if (!this.isValidUrl(url)) {
+                    this.showNotification('⚠️ URL ไม่ถูกต้อง', 'warning');
+                    return;
+                }
+
+                const link = {
+                    id: Date.now().toString(),
+                    url: url,
+                    title: title || this.extractDomainFromUrl(url),
+                    created_at: new Date().toISOString()
+                };
+
+                try {
+                    // Save to Supabase
+                    const savedLink = await this.saveToSupabase(link);
+                    
+                    // Add to local array
+                    this.links.unshift(savedLink || link);
+                    this.handleSearch();
+                    
+                    // Clear form
+                    this.urlInput.value = '';
+                    this.titleInput.value = '';
+                    
+                    this.showNotification('✅ เพิ่มลิงค์เรียบร้อยแล้ว');
+                    
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถเพิ่มลิงค์ได้: ' + error.message, 'error');
+                }
+            }
+
+            async handleDeleteLink(linkId) {
+                try {
+                    // Delete from Supabase
+                    await this.deleteFromSupabase(linkId);
+                    
+                    // Remove from local array
+                    this.links = this.links.filter(link => link.id !== linkId);
+                    this.handleSearch();
+                    
+                    this.showNotification('✅ ลบลิงค์เรียบร้อยแล้ว');
+                    
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถลบลิงค์ได้: ' + error.message, 'error');
+                }
+            }
+
+            handleClearAll() {
+                if (this.links.length === 0) {
+                    this.showNotification('⚠️ ไม่มีลิงค์ให้ลบ', 'warning');
+                    return;
+                }
+
+                const confirmed = confirm(`ต้องการลบลิงค์ทั้งหมด ${this.links.length} รายการหรือไม่?`);
+                if (!confirmed) return;
+
+                // Clear all data through Supabase function
+                this.handleClearAllData();
+            }
+
+            // Handle drag and drop
+            handleDragOver(e) {
+                e.preventDefault();
+                this.dropZone.classList.add('drag-over');
+            }
+
+            handleDragLeave(e) {
+                e.preventDefault();
+                this.dropZone.classList.remove('drag-over');
+            }
+
+            handleDrop(e) {
+                e.preventDefault();
+                this.dropZone.classList.remove('drag-over');
+
+                const url = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+                
+                if (url && this.isValidUrl(url)) {
+                    this.urlInput.value = url;
+                    this.titleInput.focus();
+                    this.showNotification('✅ ลิงค์ถูกวางแล้ว กรุณาเพิ่มชื่อ (ถ้าต้องการ)');
+                } else {
+                    this.showNotification('⚠️ ข้อมูลที่ลากมาไม่ใช่ลิงค์ที่ถูกต้อง', 'warning');
+                }
+            }
+
+            // Search functionality
+            handleSearch() {
+                const query = this.searchInput.value.toLowerCase().trim();
+                
+                if (!query) {
+                    this.filteredLinks = [...this.links];
+                } else {
+                    this.filteredLinks = this.links.filter(link => 
+                        link.title.toLowerCase().includes(query) || 
+                        link.url.toLowerCase().includes(query)
+                    );
+                }
+                
+                this.renderLinks();
+            }
+
+            // Render links
+            renderLinks() {
+                const totalCount = document.getElementById('totalCount');
+                const filteredCount = document.getElementById('filteredCount');
+                
+                totalCount.textContent = this.links.length;
+                filteredCount.textContent = this.filteredLinks.length;
+
+                if (this.filteredLinks.length === 0) {
+                    this.linksGrid.style.display = 'none';
+                    this.emptyState.style.display = 'block';
+                    return;
+                }
+
+                this.linksGrid.style.display = 'grid';
+                this.emptyState.style.display = 'none';
+
+                this.linksGrid.innerHTML = this.filteredLinks.map(link => `
+                    <div class="link-card ${this.selectedIds.has(link.id) ? 'selected' : ''}" data-id="${link.id}">
+                        ${this.selectMode ? `<input type="checkbox" class="link-checkbox" ${this.selectedIds.has(link.id) ? 'checked' : ''}>` : ''}
+                        <div class="link-title">${this.escapeHtml(link.title)}</div>
+                        <a href="${link.url}" class="link-url" target="_blank">${this.escapeHtml(link.url)}</a>
+                        <div class="link-meta">
+                            <span>📅 ${this.formatDate(link.created_at)}</span>
+                        </div>
+                        <div class="link-actions">
+                            <button class="btn btn-secondary" onclick="linkManager.copyLink('${link.url}')">
+                                📋 คัดลอก
+                            </button>
+                            <button class="btn btn-delete" onclick="linkManager.handleDeleteLink('${link.id}')">
+                                🗑️ ลบ
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Attach checkbox events if in select mode
+                if (this.selectMode) {
+                    this.attachCheckboxEvents();
+                }
+            }
+
+            // Bulk selection functionality
+            toggleSelectMode() {
+                this.selectMode = !this.selectMode;
+                this.selectedIds.clear();
+                
+                const bulkActions = document.getElementById('bulkActions');
+                const toggleBtn = this.bulkSelectToggleBtn;
+                
+                if (this.selectMode) {
+                    bulkActions.classList.add('visible');
+                    toggleBtn.textContent = '❌ ยกเลิกการเลือก';
+                } else {
+                    bulkActions.classList.remove('visible');
+                    toggleBtn.textContent = '☑️ เลือกหลายรายการ';
+                }
+                
+                this.renderLinks();
+            }
+
+            selectAllVisible() {
+                this.filteredLinks.forEach(link => {
+                    this.selectedIds.add(link.id);
+                });
+                this.renderLinks();
+            }
+
+            async deleteSelected() {
+                if (this.selectedIds.size === 0) {
+                    this.showNotification('⚠️ กรุณาเลือกลิงค์ที่ต้องการลบ', 'warning');
+                    return;
+                }
+
+                const confirmed = confirm(`ต้องการลบลิงค์ที่เลือกไว้ ${this.selectedIds.size} รายการหรือไม่?`);
+                if (!confirmed) return;
+
+                try {
+                    // Delete from Supabase
+                    for (const linkId of this.selectedIds) {
+                        await this.deleteFromSupabase(linkId);
+                    }
+                    
+                    // Remove from local array
+                    this.links = this.links.filter(link => !this.selectedIds.has(link.id));
+                    this.selectedIds.clear();
+                    this.handleSearch();
+                    
+                    this.showNotification('✅ ลบลิงค์ที่เลือกเรียบร้อยแล้ว');
+                    
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถลบลิงค์ได้: ' + error.message, 'error');
+                }
+            }
+
+            attachCheckboxEvents() {
+                const checkboxes = document.querySelectorAll('.link-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', (e) => {
+                        const linkId = e.target.closest('.link-card').dataset.id;
+                        if (e.target.checked) {
+                            this.selectedIds.add(linkId);
+                        } else {
+                            this.selectedIds.delete(linkId);
+                        }
+                        this.renderLinks();
+                    });
+                });
+            }
+
+            // Import bookmarks
+            async handleFileImport(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const text = await file.text();
+                    let links = [];
+
+                    if (file.name.endsWith('.json')) {
+                        const data = JSON.parse(text);
+                        links = Array.isArray(data) ? data : data.links || [];
+                    } else if (file.name.endsWith('.html')) {
+                        links = this.parseBookmarksHtml(text);
+                    }
+
+                    if (links.length === 0) {
+                        this.showNotification('⚠️ ไม่พบลิงค์ในไฟล์', 'warning');
+                        return;
+                    }
+
+                    let imported = 0;
+                    for (const linkData of links) {
+                        if (linkData.url && this.isValidUrl(linkData.url)) {
+                            const link = {
+                                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                                url: linkData.url,
+                                title: linkData.title || this.extractDomainFromUrl(linkData.url),
+                                created_at: new Date().toISOString()
+                            };
+
+                            try {
+                                await this.saveToSupabase(link);
+                                this.links.unshift(link);
+                                imported++;
+                            } catch (error) {
+                                console.error('Failed to import link:', error);
+                            }
+                        }
+                    }
+
+                    this.handleSearch();
+                    this.showNotification(`✅ นำเข้า ${imported} ลิงค์เรียบร้อยแล้ว`);
+
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถอ่านไฟล์ได้: ' + error.message, 'error');
+                }
+
+                // Reset file input
+                e.target.value = '';
+            }
+
+            parseBookmarksHtml(html) {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const links = [];
+
+                const anchors = doc.querySelectorAll('a[href]');
+                anchors.forEach(anchor => {
+                    links.push({
+                        url: anchor.href,
+                        title: anchor.textContent.trim()
+                    });
+                });
+
+                return links;
+            }
+
+            // Remove duplicates
+            async handleRemoveDuplicates() {
+                const seen = new Set();
+                const duplicates = [];
+                
+                this.links.forEach(link => {
+                    if (seen.has(link.url)) {
+                        duplicates.push(link.id);
+                    } else {
+                        seen.add(link.url);
+                    }
+                });
+
+                if (duplicates.length === 0) {
+                    this.showNotification('✅ ไม่พบลิงค์ซ้ำ');
+                    return;
+                }
+
+                const confirmed = confirm(`พบลิงค์ซ้ำ ${duplicates.length} รายการ ต้องการลบหรือไม่?`);
+                if (!confirmed) return;
+
+                try {
+                    // Delete duplicates from Supabase
+                    for (const linkId of duplicates) {
+                        await this.deleteFromSupabase(linkId);
+                    }
+                    
+                    // Remove from local array
+                    this.links = this.links.filter(link => !duplicates.includes(link.id));
+                    this.handleSearch();
+                    
+                    this.showNotification(`✅ ลบลิงค์ซ้ำ ${duplicates.length} รายการแล้ว`);
+                    
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถลบลิงค์ซ้ำได้: ' + error.message, 'error');
+                }
+            }
+
+            // Check and clean unsafe/long URLs
+            async handleCheckAndClean() {
+                const problematicLinks = this.links.filter(link => 
+                    link.url.length > this.maxUrlLength || 
+                    this.isUnsafeUrl(link.url)
+                );
+
+                if (problematicLinks.length === 0) {
+                    this.showNotification('✅ ไม่พบลิงค์ที่มีปัญหา');
+                    return;
+                }
+
+                const confirmed = confirm(
+                    `พบลิงค์ที่มีปัญหา ${problematicLinks.length} รายการ:\n` +
+                    `- URL ยาวเกิน ${this.maxUrlLength} ตัวอักษร\n` +
+                    `- URL ที่ไม่ปลอดภัย\n\n` +
+                    `ต้องการลบหรือไม่?`
+                );
+
+                if (!confirmed) return;
+
+                try {
+                    // Delete problematic links from Supabase
+                    for (const link of problematicLinks) {
+                        await this.deleteFromSupabase(link.id);
+                    }
+                    
+                    // Remove from local array
+                    this.links = this.links.filter(link => 
+                        !problematicLinks.some(p => p.id === link.id)
+                    );
+                    this.handleSearch();
+                    
+                    this.showNotification(`✅ ลบลิงค์ที่มีปัญหา ${problematicLinks.length} รายการแล้ว`);
+                    
+                } catch (error) {
+                    this.showNotification('❌ ไม่สามารถลบลิงค์ที่มีปัญหาได้: ' + error.message, 'error');
+                }
+            }
+
+            // Export functionality
+            exportLinks(format) {
+                if (this.links.length === 0) {
+                    this.showNotification('⚠️ ไม่มีลิงค์ให้ส่งออก', 'warning');
+                    return;
+                }
+
+                const timestamp = new Date().toISOString().split('T')[0];
+                
+                if (format === 'json') {
+                    const data = JSON.stringify(this.links, null, 2);
+                    this.downloadFile(data, `links-${timestamp}.json`, 'application/json');
+                } else if (format === 'html') {
+                    const html = this.generateBookmarksHtml();
+                    this.downloadFile(html, `bookmarks-${timestamp}.html`, 'text/html');
+                }
+
+                this.showNotification(`✅ ส่งออกเรียบร้อยแล้ว (${this.links.length} รายการ)`);
+            }
+
+            generateBookmarksHtml() {
+                const links = this.links.map(link => 
+                    `<DT><A HREF="${this.escapeHtml(link.url)}">${this.escapeHtml(link.title)}</A>`
+                ).join('\n        ');
+
+                return `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><H3>Link Manager Export</H3>
+    <DL><p>
+        ${links}
+    </DL><p>
+</DL><p>`;
+            }
+
+            downloadFile(content, filename, mimeType) {
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            // Copy link to clipboard
+            async copyLink(url) {
+                try {
+                    await navigator.clipboard.writeText(url);
+                    this.showNotification('✅ คัดลอกลิงค์แล้ว');
+                } catch (error) {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = url;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    this.showNotification('✅ คัดลอกลิงค์แล้ว');
+                }
+            }
+
+            // Utility functions
+            isValidUrl(string) {
+                try {
+                    new URL(string);
+                    return string.startsWith('http://') || string.startsWith('https://');
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            isUnsafeUrl(url) {
+                const unsafePatterns = [
+                    /javascript:/i,
+                    /data:/i,
+                    /file:/i,
+                    /ftp:/i
+                ];
+                return unsafePatterns.some(pattern => pattern.test(url));
+            }
+
+            extractDomainFromUrl(url) {
+                try {
+                    return new URL(url).hostname;
+                } catch (_) {
+                    return url;
+                }
+            }
+
+            formatDate(dateString) {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('th-TH', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            showNotification(message, type = 'success') {
+                this.notification.textContent = message;
+                this.notification.className = `notification ${type}`;
+                this.notification.classList.add('show');
+
+                setTimeout(() => {
+                    this.notification.classList.remove('show');
+                }, 3000);
+            }
+
+            // Setup drag and drop for reordering (optional)
+            setupReorderDnD() {
+                // Placeholder for reordering functionality
+                console.log('📝 Reorder DnD setup (placeholder)');
+            }
+        }
+
+        // Initialize the app
+        const linkManager = new LinkManager();
+        window.linkManager = linkManager;
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "super-link-manager",
+  "version": "1.0.0",
+  "description": "Online Link Manager with GitHub sync and Vercel deployment",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'Build completed'",
+    "dev": "node server.js"
+  },
+  "keywords": ["link-manager", "github-sync", "vercel", "bookmark-manager"],
+  "author": "Super Link Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "fs": "^0.0.1-security"
+  },
+  "engines": {
+    "node": ">=14.x"
+  }
+}

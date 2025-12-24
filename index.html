@@ -582,6 +582,9 @@
                 <button class="btn btn-secondary" id="removeDuplicatesBtn">
                     🔗 ลบลิ้งก์ซ้ำ
                 </button>
+                <button class="btn btn-secondary" id="exportBtn">
+                    💾 ส่งออก Bookmarks
+                </button>
                 <button class="btn btn-delete" id="clearAllBtn">
                     🗑️ ล้างข้อมูลทั้งหมด
                 </button>
@@ -639,6 +642,7 @@
                 this.importBtn = document.getElementById('importBtn');
                 this.bookmarkFile = document.getElementById('bookmarkFile');
                 this.removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
+                this.exportBtn = document.getElementById('exportBtn');
                 this.clearAllBtn = document.getElementById('clearAllBtn');
                 this.checkAndCleanBtn = document.getElementById('checkAndCleanBtn');
                 this.bulkSelectToggleBtn = document.getElementById('bulkSelectToggleBtn');
@@ -670,6 +674,9 @@
 
                 // Remove Duplicates Event
                 this.removeDuplicatesBtn.addEventListener('click', this.handleRemoveDuplicates.bind(this));
+
+                // Export Event
+                this.exportBtn.addEventListener('click', this.handleExport.bind(this));
 
                 // Clear All Event
                 this.clearAllBtn.addEventListener('click', this.handleClearAll.bind(this));
@@ -966,7 +973,7 @@
                 if (!link) return;
 
                 // First prompt: Edit URL
-                const newUrl = prompt('📝 แก้ไข URL ของลิงค์\n(ปล่อยว่างหรือกด Cancel เพื่อข้าม):', link.url);
+                const newUrl = prompt('📝 แก้ไข URL ของลิงค์\n(กด OK เพื่อข้ามหรือ Cancel เพื่อออก):', link.url);
                 if (newUrl === null) return; // canceled
 
                 let finalUrl = link.url;
@@ -982,9 +989,12 @@
                     }
                 }
 
-                // Second prompt: Edit Title
-                const newTitle = prompt('✏️ แก้ไขชื่อลิงค์\n(ปล่อยว่างเพื่อใช้ชื่อโดเมนโดยอัตโนมัติ):', link.title);
-                if (newTitle === null) return; // canceled
+                // Second prompt: Edit Title (always show this)
+                const newTitle = prompt('✏️ แก้ไขชื่อลิงค์ (Title)\n(ปล่อยว่างเพื่อใช้ชื่อโดเมนโดยอัตโนมัติ):', link.title);
+                if (newTitle === null) {
+                    // User canceled on title edit, don't save
+                    return;
+                }
 
                 // Update link
                 link.url = finalUrl;
@@ -1303,6 +1313,76 @@
                     this.handleSearch();
                     this.showNotification(`ลบลิงค์ซ้ำ ${duplicatesCount} รายการแล้ว! 🧹`);
                 }
+            }
+
+            handleExport() {
+                if (this.links.length === 0) {
+                    this.showNotification('ไม่มีลิงค์ให้ส่งออก', 'error');
+                    return;
+                }
+
+                // Create HTML export format (Netscape Bookmark Format)
+                const now = new Date().toLocaleString('th-TH');
+                const htmlContent = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an auto-generated file from Link Manager -->
+<!-- https://github.com/yourusername/link-manager -->
+<!-- Export Date: ${now} -->
+<META CHARSET="UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+${this.links.map(link => {
+    const dateAdded = Math.floor(link.id / 1000); // Convert ms to seconds
+    return `    <DT><A HREF="${this.escapeHtml(link.url)}" TAGS="" ADD_DATE="${dateAdded}">${this.escapeHtml(link.title)}</A>`;
+}).join('\n')}
+</DL><p>`;
+
+                // Create JSON export format
+                const jsonContent = JSON.stringify(this.links, null, 2);
+
+                // Show export options dialog
+                const format = prompt('เลือกรูปแบบการส่งออก:\\n1 = HTML (สำหรับ Browser)\\n2 = JSON\\n\\nกรุณากรอก 1 หรือ 2:', '1');
+                
+                if (format === null) return; // User cancelled
+                
+                let filename, content, mimeType;
+                
+                if (format === '1') {
+                    filename = `bookmarks_${new Date().toISOString().split('T')[0]}.html`;
+                    content = htmlContent;
+                    mimeType = 'text/html;charset=utf-8';
+                } else if (format === '2') {
+                    filename = `bookmarks_${new Date().toISOString().split('T')[0]}.json`;
+                    content = jsonContent;
+                    mimeType = 'application/json;charset=utf-8';
+                } else {
+                    this.showNotification('เลือกรูปแบบไม่ถูกต้อง', 'error');
+                    return;
+                }
+
+                // Download the file
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                this.showNotification(`ส่งออก ${this.links.length} ลิงค์สำเร็จ! 📥`);
+            }
+
+            escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return text.replace(/[&<>"']/g, m => map[m]);
             }
 
             handleClearAll() {

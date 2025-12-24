@@ -42,6 +42,14 @@
 2. **New UI control**: Add form input + button → bind event → call handler
 3. **Bulk operations**: Add to selection Set, update `updateBulkButtonsState()`, sync UI via `renderLinks()`
 
+### Editing Links
+- `handleEditLink(id)` method uses sequential prompts:
+  1. First prompt: Edit URL (validates with `isValidUrl()`)
+  2. Second prompt: Edit title (optional)
+  3. Updates favicon automatically via `getFaviconUrl()`
+  4. Saves and re-renders with `saveLinks()` → `handleSearch()`
+- Edit button appears on every link card in grid (primary color button)
+
 ### File Import Support
 - **HTML**: Parse `<a href>` elements via DOMParser
 - **JSON**: Flatten nested bookmark trees from `data.bookmarks` or `data.children` recursively

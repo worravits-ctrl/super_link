@@ -961,6 +961,41 @@
                 this.showNotification('ลบลิงค์แล้ว');
             }
 
+            handleEditLink(id) {
+                const link = this.links.find(l => l.id === id);
+                if (!link) return;
+
+                // First prompt: Edit URL
+                const newUrl = prompt('📝 แก้ไข URL ของลิงค์\n(ปล่อยว่างหรือกด Cancel เพื่อข้าม):', link.url);
+                if (newUrl === null) return; // canceled
+
+                let finalUrl = link.url;
+                if (newUrl.trim()) {
+                    if (!this.isValidUrl(newUrl)) {
+                        this.showNotification('ลิงค์ไม่ถูกต้อง', 'error');
+                        return;
+                    }
+                    if (!newUrl.startsWith('http://') && !newUrl.startsWith('https://')) {
+                        finalUrl = 'https://' + newUrl.trim();
+                    } else {
+                        finalUrl = newUrl.trim();
+                    }
+                }
+
+                // Second prompt: Edit Title
+                const newTitle = prompt('✏️ แก้ไขชื่อลิงค์\n(ปล่อยว่างเพื่อใช้ชื่อโดเมนโดยอัตโนมัติ):', link.title);
+                if (newTitle === null) return; // canceled
+
+                // Update link
+                link.url = finalUrl;
+                link.title = newTitle.trim() || this.extractDomainFromUrl(finalUrl);
+                link.favicon = this.getFaviconUrl(finalUrl);
+
+                this.saveLinks();
+                this.handleSearch();
+                this.showNotification('แก้ไขลิงค์สำเร็จ! ✏️');
+            }
+
             handleSearch() {
                 const query = this.searchInput.value.toLowerCase().trim();
                 
@@ -999,6 +1034,9 @@
                         </div>
                         <div class="link-url">${link.url}</div>
                         <div class="link-actions">
+                            <button class="btn btn-secondary" onclick="linkManager.handleEditLink(${link.id})" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--primary-color);">
+                                ✏️ แก้ไข
+                            </button>
                             <button class="btn btn-delete" onclick="linkManager.deleteLink(${link.id})">
                                 🗑️ ลบ
                             </button>
